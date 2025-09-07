@@ -47,6 +47,18 @@ Dataset-specific features:
 	- Map: plots communities with coordinates.
 	- Table: important park details and popular amenities.
 
+
+## Sources
+
+The following official sources are used for scraping and live data:
+
+- **CA HCD Mobilehome/RV Park Search (official):**  
+	https://cahcd.my.site.com/s/mobilehomeparksearch
+- **MHVillage — Riverside County parks directory:**  
+	https://www.mhvillage.com/parks/ca/riverside-county
+- **RivCoView — Assessor/Property portal:**  
+	https://rivcoview.rivcoacr.org/
+
 ## CLI scraping
 
 Run the scrapers from the command line and save to JSON/CSV.
