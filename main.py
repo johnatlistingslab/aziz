@@ -36,6 +36,24 @@ def load_json_from_url(url: str) -> Optional[Any]:
         st.error(f"Failed to load JSON from URL: {e}")
         return None
 
+# ---------- Cached dataset fetchers ----------
+@st.cache_data(show_spinner=False)
+def cached_ca_hcd(county_code: str = "33") -> Any:
+    """Cached CA HCD fetch."""
+    return fetch_ca_hcd(county_code)
+
+
+@st.cache_data(show_spinner=False)
+def cached_rivcoview(query_value: str = "Riverside", limit_rows: int | None = 200) -> Any:
+    """Cached RivCoView fetch."""
+    return fetch_rivcoview(query_value=query_value, limit_rows=limit_rows)
+
+
+@st.cache_data(show_spinner=False)
+def cached_mhvillage_details(county: str = "Riverside", state: str = "CA") -> Any:
+    """Cached MHVillage details fetch."""
+    return fetch_mhvillage_details(county=county, state=state)
+
 def coerce_numeric(series: pd.Series) -> pd.Series:
     """Coerce a pandas Series to a numeric type, converting errors to NaN."""
     return pd.to_numeric(series, errors="coerce")
@@ -281,13 +299,26 @@ with st.sidebar:
     st.caption("Data is fetched live from source APIs on each run.")
     st.divider()
 
-def section_header(label: str, source: Optional[str] = None):
-    """Render a standardized section header with a title and source label."""
-    cols = st.columns([1, 3])
+def section_header(
+    label: str,
+    source: Optional[str] = None,
+    refresh_key: Optional[str] = None,
+    on_refresh: Optional[callable] = None,
+):
+    """Render a section header with optional per-dataset refresh button."""
+    cols = st.columns([1, 2, 1])
     with cols[0]:
         st.subheader(label)
     with cols[1]:
-        st.caption(f"Source: {source or 'Live API'}")
+        st.caption(f"Source: {source or 'Live API'} | Cached; use Refresh to re-fetch")
+    with cols[2]:
+        if refresh_key and st.button("Refresh data", key=refresh_key):
+            if on_refresh:
+                try:
+                    on_refresh()
+                finally:
+                    pass
+            st.toast("Cache cleared. Re-fetching…", icon="🔄")
 
     
 
@@ -354,9 +385,15 @@ def enrich_rivco_row(row: pd.Series) -> dict:
 
 # ---------- Render Functions for Each Dataset ----------
 def render_ca_hcd():
-    section_header("CA HCD (Parks)", "Live API")
+    # Header with per-dataset refresh
+    section_header(
+        "CA HCD (Parks)",
+        "Live API",
+        refresh_key="refresh_ca_hcd",
+        on_refresh=lambda: cached_ca_hcd.clear(),
+    )
     with st.spinner("Fetching CA HCD parks..."):
-        data = fetch_ca_hcd()
+        data = cached_ca_hcd()
     df = as_dataframe(data)
 
     if df.empty:
@@ -415,9 +452,15 @@ def render_ca_hcd():
     st.dataframe(sanitize_for_arrow(fdf, prefer_cols=show_cols), use_container_width=True)
 
 def render_rivcoview():
-    section_header("RivCoView (Assessor details)", "Live API")
+    # Header with per-dataset refresh
+    section_header(
+        "RivCoView (Assessor details)",
+        "Live API",
+        refresh_key="refresh_rivco",
+        on_refresh=lambda: cached_rivcoview.clear(),
+    )
     with st.spinner("Fetching RivCoView parcels..."):
-        data = fetch_rivcoview()
+        data = cached_rivcoview()
     flat = flatten_records_maybe(data)
     df = as_dataframe(flat)
 
@@ -482,9 +525,15 @@ def render_rivcoview():
     st.dataframe(sanitize_for_arrow(enrich_df, prefer_cols=show_cols), use_container_width=True)
 
 def render_mhvillage():
-    section_header("MHVillage (Park details)", "Live API")
+    # Header with per-dataset refresh
+    section_header(
+        "MHVillage (Park details)",
+        "Live API",
+        refresh_key="refresh_mhvillage",
+        on_refresh=lambda: cached_mhvillage_details.clear(),
+    )
     with st.spinner("Fetching MHVillage communities..."):
-        data = fetch_mhvillage_details()
+        data = cached_mhvillage_details()
     df = as_dataframe(data)
 
     if df.empty:
@@ -585,6 +634,5 @@ if "MHVillage" in chosen:
     render_mhvillage()
     st.divider()
 
-## (Removed uploaded mobile home dataset rendering)
 
 st.caption("Tip: use the sidebar to filter datasets.")
